@@ -1,0 +1,25 @@
+Manchester City,15,10,3,2
+Liverpool,15,9,3,3
+Arsenal,15,8,5,2
+Manchester United,15,8,4,3
+Chelsea,16,8,4,4
+Tottenham,15,7,3,5
+Aston Villa,15,7,2,6
+Brighton,15,6,5,4
+Newcastle,15,6,4,5
+Brentford,15,6,3,6
+Fulham,15,6,3,6
+Crystal Palace,15,5,5,5
+Leicester,15,5,4,6
+Bournemouth,15,5,3,7
+West Ham,15,5,3,7
+Wolverhampton,15,5,3,7
+Everton,15,4,5,6
+Nottingham Forest,15,4,5,6
+Southampton,15,4,4,7
+Leeds United,15,4,4,7
+Watford,16,4,4,8
+Burnley,15,4,3,8
+Blackburn,15,4,3,8
+Sheffield United,15,3,5,7
+Stoke City,15,3,4,8
