@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <cctype>
 #include <iomanip>
+#include <limits>
 #include "Team.h"
 
 // Глобальный вектор для хранения команд
@@ -202,75 +203,176 @@ void displayAllTeams() {
     }
 }
 
-// Функция для получения названия команды с проверкой на английские буквы
-std::string getTeamNameFromUser(const std::string& prompt) {
-    std::string teamName;
-    bool validName = false;
+// Функция для поиска похожих команд
+std::vector<std::string> findSimilarTeams(const std::string& name) {
+    std::vector<std::string> similar;
+    std::string lowerName = name;
+    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
     
-    while (!validName) {
+    for (const auto& team : teams) {
+        std::string teamName = team.getName();
+        std::string lowerTeamName = teamName;
+        std::transform(lowerTeamName.begin(), lowerTeamName.end(), lowerTeamName.begin(), ::tolower);
+        
+        if (lowerTeamName.find(lowerName) != std::string::npos || 
+            lowerName.find(lowerTeamName) != std::string::npos) {
+            similar.push_back(teamName);
+        }
+    }
+    return similar;
+}
+
+// Функция для получения названия команды с проверкой на английские буквы
+std::string getTeamNameFromUser(const std::string& prompt, const std::string& excludeTeam = "") {
+    while (true) {
         std::cout << prompt;
+        std::string teamName;
         std::getline(std::cin, teamName);
         
         if (!isEnglishString(teamName)) {
             std::cout << "Ошибка: используйте только английские буквы!\n";
+            continue;
+        }
+
+        // Поиск похожих команд
+        auto similarTeams = findSimilarTeams(teamName);
+        
+        // Удаляем исключенную команду из списка похожих
+        if (!excludeTeam.empty()) {
+            similarTeams.erase(
+                std::remove_if(similarTeams.begin(), similarTeams.end(),
+                    [&](const std::string& team) { return team == excludeTeam; }),
+                similarTeams.end()
+            );
+        }
+        
+        if (!similarTeams.empty()) {
+            std::cout << "\nНайдены похожие команды:\n";
+            for (size_t i = 0; i < similarTeams.size(); ++i) {
+                std::cout << (i + 1) << ". " << similarTeams[i] << "\n";
+            }
+            std::cout << "0. Создать новую команду\n";
+            std::cout << "Выберите номер команды или 0 для создания новой: ";
+            
+            int choice;
+            while (!(std::cin >> choice) || choice < 0 || choice > static_cast<int>(similarTeams.size())) {
+                std::cin.clear();
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                std::cout << "Ошибка! Введите корректный номер: ";
+            }
+            std::cin.ignore();
+            
+            if (choice == 0) {
+                // Проверяем, не совпадает ли новая команда с исключенной
+                if (teamName == excludeTeam) {
+                    std::cout << "Ошибка: нельзя выбрать ту же команду!\n";
+                    continue;
+                }
+                
+                std::cout << "Создать новую команду \"" << teamName << "\"? (y/n): ";
+                char confirm;
+                std::cin >> confirm;
+                std::cin.ignore();
+                
+                if (confirm == 'y' || confirm == 'Y') {
+                    teams.emplace_back(teamName);
+                    std::cout << "Создана новая команда: " << teamName << "\n";
+                    return teamName;
+                }
+                continue; // Если отказались создавать новую команду, начинаем сначала
+            } else {
+                // Проверяем, не совпадает ли выбранная команда с исключенной
+                if (similarTeams[choice - 1] == excludeTeam) {
+                    std::cout << "Ошибка: нельзя выбрать ту же команду!\n";
+                    continue;
+                }
+                return similarTeams[choice - 1];
+            }
         } else {
-            validName = true;
+            // Проверяем, не совпадает ли новая команда с исключенной
+            if (teamName == excludeTeam) {
+                std::cout << "Ошибка: нельзя выбрать ту же команду!\n";
+                continue;
+            }
+            
+            std::cout << "Создать новую команду \"" << teamName << "\"? (y/n): ";
+            char confirm;
+            std::cin >> confirm;
+            std::cin.ignore();
+            
+            if (confirm == 'y' || confirm == 'Y') {
+                teams.emplace_back(teamName);
+                std::cout << "Создана новая команда: " << teamName << "\n";
+                return teamName;
+            }
+            continue; // Если отказались создавать новую команду, начинаем сначала
         }
     }
-    return teamName;
 }
 
 // Функция для добавления результата матча
 void addMatchResult() {
-    char result;
-    std::string winner, loser;
-
-    std::cout << "Введите результат матча (V - победа, D - ничья): ";
-    std::cin >> result;
+    int matchCount;
+    std::cout << "Сколько матчей вы хотите добавить: ";
+    while (!(std::cin >> matchCount) || matchCount <= 0) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Ошибка! Введите положительное число: ";
+    }
     std::cin.ignore();
 
-    if (result != 'V' && result != 'D') {
-        std::cout << "Неверный формат результата!\n";
-        return;
-    }
-
-    if (result == 'V') {
-        winner = getTeamNameFromUser("Введите название команды-победителя (на английском): ");
-        loser = getTeamNameFromUser("Введите название проигравшей команды (на английском): ");
-
-        auto winTeam = std::find_if(teams.begin(), teams.end(),
-            [&](const Team& t) { return t.getName() == winner; });
-        auto loseTeam = std::find_if(teams.begin(), teams.end(),
-            [&](const Team& t) { return t.getName() == loser; });
-
-        if (winTeam == teams.end() || loseTeam == teams.end()) {
-            std::cout << "Одна или обе команды не найдены в базе данных!\n";
-            return;
+    for (int i = 0; i < matchCount; ++i) {
+        std::cout << "\nМатч " << (i + 1) << " из " << matchCount << "\n";
+        char result;
+        bool validInput = false;
+        
+        while (!validInput) {
+            std::cout << "Введите результат матча (V - победа, D - ничья): ";
+            std::string input;
+            std::getline(std::cin, input);
+            
+            if (input.length() == 1) {
+                result = std::toupper(input[0]);
+                if (result == 'V' || result == 'D') {
+                    validInput = true;
+                } else {
+                    std::cout << "Ошибка! Введите 'V' для победы или 'D' для ничьи\n";
+                }
+            } else {
+                std::cout << "Ошибка! Введите один символ: 'V' для победы или 'D' для ничьи\n";
+            }
         }
 
-        winTeam->addWin();
-        loseTeam->addLoss();
-    }
-    else { // Ничья
-        winner = getTeamNameFromUser("Введите название первой команды (на английском): ");
-        loser = getTeamNameFromUser("Введите название второй команды (на английском): ");
+        if (result == 'V') {
+            std::string winner = getTeamNameFromUser("Введите название команды-победителя (на английском): ");
+            std::string loser = getTeamNameFromUser("Введите название проигравшей команды (на английском): ", winner);
 
-        auto team1 = std::find_if(teams.begin(), teams.end(),
-            [&](const Team& t) { return t.getName() == winner; });
-        auto team2 = std::find_if(teams.begin(), teams.end(),
-            [&](const Team& t) { return t.getName() == loser; });
+            auto winTeam = std::find_if(teams.begin(), teams.end(),
+                [&](const Team& t) { return t.getName() == winner; });
+            auto loseTeam = std::find_if(teams.begin(), teams.end(),
+                [&](const Team& t) { return t.getName() == loser; });
 
-        if (team1 == teams.end() || team2 == teams.end()) {
-            std::cout << "Одна или обе команды не найдены в базе данных!\n";
-            return;
+            winTeam->addWin();
+            loseTeam->addLoss();
+            std::cout << "Результат матча успешно добавлен.\n";
         }
+        else { // Ничья
+            std::string team1 = getTeamNameFromUser("Введите название первой команды (на английском): ");
+            std::string team2 = getTeamNameFromUser("Введите название второй команды (на английском): ", team1);
 
-        team1->addDraw();
-        team2->addDraw();
+            auto team1It = std::find_if(teams.begin(), teams.end(),
+                [&](const Team& t) { return t.getName() == team1; });
+            auto team2It = std::find_if(teams.begin(), teams.end(),
+                [&](const Team& t) { return t.getName() == team2; });
+
+            team1It->addDraw();
+            team2It->addDraw();
+            std::cout << "Результат матча успешно добавлен.\n";
+        }
     }
 
     sortTeams();
-    std::cout << "Результат матча успешно добавлен.\n";
+    std::cout << "\nВсе матчи успешно добавлены.\n";
     std::cout << "Не забудьте сохранить изменения через меню.\n";
 }
 
@@ -500,8 +602,12 @@ int main() {
         std::cout << "Выберите действие: ";
 
         int choice;
-        std::cin >> choice;
-        std::cin.ignore();
+        while (!(std::cin >> choice) || choice < 0 || choice > 8) {
+            std::cin.clear(); // Очищаем флаги ошибок
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Очищаем буфер
+            std::cout << "Ошибка! Введите число от 0 до 8: ";
+        }
+        std::cin.ignore(); // Очищаем символ новой строки после корректного ввода
 
         switch (choice) {
             case 1:
